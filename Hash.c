@@ -13,6 +13,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+/* ตัวจับเวลาละเอียดสูง (clock() บน Windows ละเอียดแค่ ~1 ms) */
+double NowMs(void)
+{
+#ifdef _WIN32
+    LARGE_INTEGER f, c;
+    QueryPerformanceFrequency(&f);
+    QueryPerformanceCounter(&c);
+    return (double)c.QuadPart * 1000.0 / (double)f.QuadPart;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+#endif
+}
 
 #define MAXN   100000
 #define REPEAT 1000      /* จำนวนรอบที่วนค้นหาซ้ำ ใช้ค่าเดียวกันทุกการทดลอง */
@@ -73,29 +91,48 @@ int BinarySearch(int arr[], int size, int target)
    แทนที่เนื้อในของฟังก์ชันนี้ด้วยอัลกอริทึมการค้นหาของกลุ่มตนเอง
    เช่น การค้นหาใน BST, AVL Tree, Hash Table หรือวิธีอื่นที่ออกแบบไว้
    ===================================================================== */
+/* ---------- Hash Table (chaining) ของกลุ่ม ---------- */
+#define HSIZE 262144          /* ใหญ่กว่า 2 เท่าของ MAXN */
+int hhead[HSIZE];             /* ตำแหน่งตัวแรกในแต่ละช่อง, -1 = ว่าง */
+int hnext[MAXN];              /* ตำแหน่งตัวถัดไปในช่องเดียวกัน */
+
+void BuildHash(int arr[], int size)   /* เตรียมข้อมูล ไม่นับเวลา */
+{
+    int i, h;
+    for (i = 0; i < HSIZE; i++) hhead[i] = -1;
+    for (i = 0; i < size; i++) {
+        h = arr[i] % HSIZE;
+        hnext[i] = hhead[h];
+        hhead[h] = i;
+    }
+}
+
 int MySearch(int arr[], int size, int target)
 {
-    return SequentialSearch(arr, size, target);   /* <-- เปลี่ยนตรงนี้ */
+    int i;
+    if (target < 0) return -1;
+    for (i = hhead[target % HSIZE]; i != -1; i = hnext[i])
+        if (arr[i] == target)
+            return i;
+    return -1;
 }
 
 /* ---------- วัดเวลาเฉลี่ยต่อการค้นหาหนึ่งครั้ง หน่วยเป็นมิลลิวินาที ---------- */
 double MeasureMillisec(int (*SearchFunc)(int[], int, int),
                        int arr[], int size, int targets[], int tcount)
 {
-    clock_t start, end;
-    double  total_sec;
+    double  start, end;
     int     r, i, result = 0;
 
-    start = clock();                                  /* เริ่มจับเวลา */
+    start = NowMs();                                  /* เริ่มจับเวลา */
     for (r = 0; r < REPEAT; r++)
         for (i = 0; i < tcount; i++)
             result += SearchFunc(arr, size, targets[i]);
-    end = clock();                                    /* หยุดจับเวลา */
+    end = NowMs();                                    /* หยุดจับเวลา */
 
     if (result == -99999999) printf(" ");  /* กันคอมไพเลอร์ตัดโค้ดทิ้ง */
 
-    total_sec = (double)(end - start) / CLOCKS_PER_SEC;
-    return total_sec * 1000.0 / (REPEAT * tcount);    /* เฉลี่ยต่อหนึ่งครั้ง */
+    return (end - start) / (REPEAT * tcount);         /* เฉลี่ยต่อหนึ่งครั้ง (ms) */
 }
 
 int main(int argc, char *argv[])
@@ -115,6 +152,7 @@ int main(int argc, char *argv[])
 
     for (i = 0; i < n; i++) sorted_data[i] = data[i];
     qsort(sorted_data, n, sizeof(int), CompareInt);
+    BuildHash(data, n);   /* สร้างตารางแฮช (ไม่จับเวลาส่วนนี้) */
 
     printf("=====================================================\n");
     printf(" ไฟล์ข้อมูล      : %s\n", argv[1]);
