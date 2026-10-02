@@ -9,10 +9,7 @@
 
    ให้แต่ละกลุ่มแทนที่ฟังก์ชัน MySearch ด้วยอัลกอริทึมการค้นหาของกลุ่มตนเอง
    ===================================================================== */
-#define _POSIX_C_SOURCE 199309L
-#include <stdio.h>
-#include <time.h>
-// ... includes อื่นๆ
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -139,6 +136,14 @@ double MeasureMillisec(int (*SearchFunc)(int[], int, int),
     return (end - start) / (REPEAT * tcount);         /* เฉลี่ยต่อหนึ่งครั้ง (ms) */
 }
 
+/* ---------- พิมพ์ข้อความแล้วเติมช่องว่างให้ครบความกว้างคอลัมน์ ---------- */
+void PrintCell(const char *text, int shown_width, int col_width)
+{
+    int k;
+    printf("%s", text);
+    for (k = shown_width; k < col_width; k++) putchar(' ');
+}
+
 int main(int argc, char *argv[])
 {
     int    targets[100], tcount, i;
@@ -169,13 +174,20 @@ int main(int argc, char *argv[])
 
     /* ---- ตรวจความถูกต้องก่อนวัดเวลา ---- */
     printf("\n[ ตรวจความถูกต้องของผลการค้นหา ]\n");
-    printf(" %-12s %-10s %-10s\n", "ค่าที่ค้นหา", "Sequential", "Binary");
+    /* %-10s นับเป็น "ไบต์" แต่ภาษาไทยกว้างไม่เท่าไบต์ คอลัมน์เลยเบี้ยว
+       จึงเติมช่องว่างเองตามความกว้างที่แสดงจริงบนหน้าจอ */
+    PrintCell("ค่าที่ค้นหา", 7, 14);
+    PrintCell("Sequential", 10, 12);
+    PrintCell("Binary", 6, 12);
+    printf("Hash\n");
     for (i = 0; i < tcount; i++) {
         int a = SequentialSearch(data, n, targets[i]);
         int b = BinarySearch(sorted_data, n, targets[i]);
-        printf(" %-12d %-10s %-10s\n", targets[i],
-               (a >= 0) ? "พบ" : "ไม่พบ",
-               (b >= 0) ? "พบ" : "ไม่พบ");
+        int c = MySearch(data, n, targets[i]);
+        printf("%-14d", targets[i]);
+        if (a >= 0) PrintCell("พบ", 2, 12); else PrintCell("ไม่พบ", 4, 12);
+        if (b >= 0) PrintCell("พบ", 2, 12); else PrintCell("ไม่พบ", 4, 12);
+        if (c >= 0) printf("พบ\n");        else printf("ไม่พบ\n");
     }
 
     /* ---- วัดเวลา: วน 5 ครั้ง ---- */
